@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>米国株チャート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root {
+  --paper: #f5f7fa; --panel: #ffffff; --ink: #16202e; --muted: #5b6676; --line: #dde3eb;
+  --accent: #1d4ed8; --accent-ink: #ffffff; --up: #0f8a6c; --down: #d1452f;
+  --ma1: #d48a0b; --ma2: #7a5af0; --note-bg: #fff6e0; --note-ink: #6b4a00; --err-bg: #fdecea; --err-ink: #9b2c1c;
+  --f-body: "Zen Kaku Gothic New", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  --f-num: "IBM Plex Mono", Consolas, ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0f141b; --panel: #161d27; --ink: #e6ebf2; --muted: #95a1b2; --line: #2a3442;
+    --accent: #6b93ff; --accent-ink: #0b1220; --up: #2fc39b; --down: #ff7059;
+    --ma1: #f2b441; --ma2: #a58cff; --note-bg: #2b2414; --note-ink: #f0d58c; --err-bg: #3a1a16; --err-ink: #ffb4a6;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.6; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 20px 16px 40px; display: flex; flex-direction: column; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
+h1 { font-size: 1.25rem; margin: 0; }
+.sub { margin: 2px 0 0; color: var(--muted); font-size: .85rem; }
+form.ticker { display: flex; gap: 8px; }
+input[type=text], input[type=password] {
+  font-family: var(--f-num); font-size: 1rem; padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink); min-width: 0;
+}
+#tickerInput { width: 9.5em; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; font-size: 1.05rem; }
+button { font-family: inherit; cursor: pointer; }
+.btn-primary { padding: 8px 16px; border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: .95rem; }
+.btn-primary:disabled { opacity: .5; cursor: wait; }
+.btn-ghost { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--ink); font-size: .85rem; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+.group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.group-label { font-size: .78rem; color: var(--muted); letter-spacing: .08em; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); flex-wrap: wrap; }
+.seg button { border: 0; background: transparent; color: var(--ink); padding: 6px 12px; font-size: .88rem; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); font-weight: 700; }
+
+.summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+.sym { font-family: var(--f-num); font-size: 1.6rem; font-weight: 600; letter-spacing: .04em; }
+.name { color: var(--muted); font-size: .9rem; }
+.price { font-family: var(--f-num); font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+.chg { font-family: var(--f-num); font-variant-numeric: tabular-nums; font-weight: 600; }
+.up { color: var(--up); } .down { color: var(--down); }
+.stats { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); font-size: .85rem; }
+.stats b { font-family: var(--f-num); font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.chart-box { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 6px 4px; display: flex; flex-direction: column; gap: 6px; }
+.readout { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 0 8px; font-family: var(--f-num); font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.4em; }
+.readout b { color: var(--ink); font-weight: 500; }
+.legend { display: flex; gap: 14px; padding: 0 8px; font-size: .8rem; color: var(--muted); flex-wrap: wrap; }
+.legend label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.swatch { width: 16px; height: 3px; border-radius: 2px; display: inline-block; }
+#chart { height: min(62vh, 520px); min-height: 300px; width: 100%; position: relative; }
+.empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--muted); padding: 16px; z-index: 3; pointer-events: none; }
+
+.msg { border-radius: 10px; padding: 12px 14px; font-size: .9rem; }
+.msg.info { background: var(--note-bg); color: var(--note-ink); }
+.msg.error { background: var(--err-bg); color: var(--err-ink); }
+
+.keybox { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.keybox h2 { margin: 0; font-size: 1.05rem; }
+.keybox p { margin: 0; color: var(--muted); font-size: .9rem; max-width: 65ch; }
+.keyrow { display: flex; gap: 8px; flex-wrap: wrap; }
+#keyInput { flex: 1 1 260px; }
+footer { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; color: var(--muted); font-size: .82rem; border-top: 1px solid var(--line); padding-top: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>米国株チャート</h1>
+      <p class="sub">ティッカーを入れて、日足・週足・月足と期間を切り替えて見る</p>
+    </div>
+    <form class="ticker" id="tickerForm" autocomplete="off">
+      <input type="text" id="tickerInput" aria-label="ティッカー" value="QQQ" maxlength="12" spellcheck="false">
+      <button class="btn-primary" id="goBtn" type="submit">表示</button>
+    </form>
+  </header>
+
+  <section class="keybox" id="keyBox" hidden>
+    <h2>はじめに：Twelve Dataのキーを入れてください</h2>
+    <p>Twelve Dataの管理画面「API keys」で「Reveal」を押して表示した英数字を、下の欄に貼り付けて「保存」を押します。キーはこのパソコンのブラウザの中だけに保存され、ほかには送られません（株価を取るときにTwelve Dataへ送るだけです）。</p>
+    <form class="keyrow" id="keyForm" autocomplete="off">
+      <input type="password" id="keyInput" placeholder="ここにキーを貼り付け" spellcheck="false" aria-label="APIキー">
+      <button class="btn-primary" type="submit">保存</button>
+    </form>
+  </section>
+
+  <div class="msg error" id="errBox" hidden></div>
+
+  <div class="controls">
+    <div class="group">
+      <span class="group-label">足</span>
+      <div class="seg" id="tfSeg">
+        <button type="button" data-tf="D" aria-pressed="true">日足</button>
+        <button type="button" data-tf="W" aria-pressed="false">週足</button>
+        <button type="button" data-tf="M" aria-pressed="false">月足</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="group-label">期間</span>
+      <div class="seg" id="rangeSeg">
+        <button type="button" data-m="3" aria-pressed="false">3か月</button>
+        <button type="button" data-m="6" aria-pressed="false">6か月</button>
+        <button type="button" data-m="12" aria-pressed="true">1年</button>
+        <button type="button" data-m="36" aria-pressed="false">3年</button>
+        <button type="button" data-m="60" aria-pressed="false">5年</button>
+        <button type="button" data-m="120" aria-pressed="false">10年</button>
+        <button type="button" data-m="0" aria-pressed="false">全期間</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <span class="sym" id="sym">—</span>
+    <span class="name" id="exch"></span>
+    <span class="price" id="price"></span>
+    <span class="chg" id="chg"></span>
+  </div>
+  <div class="stats" id="stats"></div>
+
+  <div class="chart-box">
+    <div class="readout" id="readout"></div>
+    <div id="chart"><div class="empty" id="emptyMsg">キーを保存すると、ここにチャートが表示されます</div></div>
+    <div class="legend">
+      <label><input type="checkbox" id="ma1Toggle" checked><span class="swatch" style="background:var(--ma1)"></span><span id="ma1Label">50日線</span></label>
+      <label><input type="checkbox" id="ma2Toggle" checked><span class="swatch" style="background:var(--ma2)"></span><span id="ma2Label">200日線</span></label>
+      <label><input type="checkbox" id="volToggle" checked>出来高</label>
+    </div>
+  </div>
+
+  <footer>
+    <span id="srcNote">株価データ：Twelve Data（日足の終値ベース。配当は含みません）</span>
+    <button type="button" class="btn-ghost" id="changeKey">キーを変更する</button>
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const KEY_STORE = "twelvedata_api_key";
+  const CACHE_PREFIX = "td_cache_v1_";
+  const state = { ticker: "", daily: [], meta: null, tf: "D", months: 12 };
+
+  // ---------- 保存（このパソコンのブラウザ内） ----------
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
+    del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+  };
+  let memKey = null;
+  const getKey = () => store.get(KEY_STORE) || memKey;
+
+  // ---------- 表示用 ----------
+  const pad = (n) => String(n).padStart(2, "0");
+  const ymd = (d) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  const fmt = (n) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtDate = (t) => (typeof t === "string" ? t : `${t.year}-${pad(t.month)}-${pad(t.day)}`).replace(/-/g, "/");
+  function showError(text) { $("errBox").textContent = text; $("errBox").hidden = !text; }
+
+  // ---------- Twelve Dataから日足を取得 ----------
+  async function fetchDaily(ticker) {
+    const today = ymd(new Date());
+    const cacheKey = CACHE_PREFIX + ticker;
+    const cached = store.get(cacheKey);
+    if (cached) {
+      try {
+        const c = JSON.parse(cached);
+        if (c.fetched === today && c.values && c.values.length) return c;
+      } catch (e) {}
+    }
+    const url = "https://api.twelvedata.com/time_series?" + new URLSearchParams({
+      symbol: ticker, interval: "1day", outputsize: "5000", order: "ASC", apikey: getKey(),
+    });
+    let res;
+    try { res = await fetch(url); }
+    catch (e) { throw new Error("Twelve Dataに接続できませんでした。インターネットにつながっているか確認してください。"); }
+    const json = await res.json().catch(() => null);
+    if (!json) throw new Error("Twelve Dataから正しい返事がありませんでした。少し待ってからもう一度試してください。");
+    if (json.status === "error") {
+      const code = json.code;
+      if (code === 401 || code === 403) throw new Error("キーが正しくないようです。「キーを変更する」から貼り付け直してください。");
+      if (code === 429) throw new Error("無料プランの回数上限（1分8回・1日800回）に達しました。1分ほど待つか、明日もう一度試してください。");
+      if (code === 400 || code === 404) throw new Error(`「${ticker}」のデータが見つかりませんでした。ティッカーの綴りを確認してください（例：AAPL、QQQ、BRK.B）。`);
+      throw new Error("データを取得できませんでした（" + (json.message || "不明なエラー") + "）");
+    }
+    const values = (json.values || []).map((v) => ({
+      time: v.datetime.slice(0, 10), open: +v.open, high: +v.high, low: +v.low, close: +v.close, volume: +(v.volume || 0),
+    })).filter((b) => isFinite(b.close)).sort((a, b) => (a.time < b.time ? -1 : 1));
+    if (!values.length) throw new Error(`「${ticker}」の株価データが空でした。`);
+    const out = { fetched: today, meta: json.meta || {}, values };
+    if (!store.set(cacheKey, JSON.stringify(out))) {
+      // 容量いっぱいなら古いキャッシュを消して再挑戦
+      try { Object.keys(localStorage).filter((k) => k.startsWith(CACHE_PREFIX)).forEach((k) => store.del(k)); } catch (e) {}
+      store.set(cacheKey, JSON.stringify(out));
+    }
+    return out;
+  }
+
+  // ---------- 週足・月足の作成 ----------
+  function aggregate(daily, tf) {
+    if (tf === "D") return daily;
+    const groups = new Map();
+    for (const b of daily) {
+      const d = new Date(b.time + "T00:00:00Z");
+      let key;
+      if (tf === "W") { const m = new Date(d); m.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); key = ymd(m); }
+      else key = b.time.slice(0, 7);
+      const g = groups.get(key);
+      if (!g) groups.set(key, { time: b.time, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume });
+      else { g.high = Math.max(g.high, b.high); g.low = Math.min(g.low, b.low); g.close = b.close; g.volume += b.volume; }
+    }
+    return [...groups.values()];
+  }
+  function sma(bars, n) {
+    const out = []; let sum = 0;
+    for (let i = 0; i < bars.length; i++) {
+      sum += bars[i].close; if (i >= n) sum -= bars[i - n].close;
+      if (i >= n - 1) out.push({ time: bars[i].time, value: +(sum / n).toFixed(2) });
+    }
+    return out;
+  }
+  const MA = { D: [[50, "50日線"], [200, "200日線"]], W: [[13, "13週線"], [26, "26週線"]], M: [[12, "12か月線"], [24, "24か月線"]] };
+
+  // ---------- チャート ----------
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  let chart, candle, vol, ma1, ma2, currentBars = [];
+  function theme() {
+    return {
+      layout: { background: { type: "solid", color: css("--panel") }, textColor: css("--muted"), fontFamily: "IBM Plex Mono, Consolas, monospace" },
+      grid: { vertLines: { color: css("--line") }, horzLines: { color: css("--line") } },
+      rightPriceScale: { borderColor: css("--line") }, timeScale: { borderColor: css("--line") },
+    };
+  }
+  function colors() {
+    const up = css("--up"), dn = css("--down");
+    candle.applyOptions({ upColor: up, downColor: dn, borderUpColor: up, borderDownColor: dn, wickUpColor: up, wickDownColor: dn });
+    ma1.applyOptions({ color: css("--ma1") }); ma2.applyOptions({ color: css("--ma2") });
+  }
+  function initChart() {
+    if (!window.LightweightCharts) { showError("チャートの部品を読み込めませんでした。インターネットにつながっているか確認して、ページを開き直してください。"); return false; }
+    chart = LightweightCharts.createChart($("chart"), Object.assign({ autoSize: true, localization: { locale: "ja-JP", dateFormat: "yyyy/MM/dd" }, crosshair: { mode: 0 } }, theme()));
+    candle = chart.addCandlestickSeries();
+    candle.priceScale().applyOptions({ scaleMargins: { top: 0.06, bottom: 0.24 } });
+    vol = chart.addHistogramSeries({ priceScaleId: "vol", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
+    chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+    ma1 = chart.addLineSeries({ lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
+    ma2 = chart.addLineSeries({ lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
+    colors();
+    chart.subscribeCrosshairMove((p) => { const b = p && p.time ? p.seriesData.get(candle) : null; readout(b ? { ...b, time: p.time } : null); });
+    try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { chart.applyOptions(theme()); colors(); render(false); }); } catch (e) {}
+    return true;
+  }
+  function readout(b) {
+    if (!b) b = currentBars[currentBars.length - 1];
+    if (!b) { $("readout").textContent = ""; return; }
+    $("readout").innerHTML = `<span>${fmtDate(b.time)}</span><span>始 <b>${fmt(b.open)}</b></span><span>高 <b>${fmt(b.high)}</b></span><span>安 <b>${fmt(b.low)}</b></span><span>終 <b>${fmt(b.close)}</b></span>`;
+  }
+  function monthsBefore(t, m) { const d = new Date(t + "T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() - m); return ymd(d); }
+
+  function render(fit = true) {
+    if (!chart || !state.daily.length) return;
+    const bars = aggregate(state.daily, state.tf);
+    currentBars = bars;
+    candle.setData(bars);
+    const up = css("--up"), dn = css("--down");
+    vol.setData($("volToggle").checked ? bars.map((b) => ({ time: b.time, value: b.volume, color: (b.close >= b.open ? up : dn) + "55" })) : []);
+    const [[n1, l1], [n2, l2]] = MA[state.tf];
+    $("ma1Label").textContent = l1; $("ma2Label").textContent = l2;
+    ma1.setData($("ma1Toggle").checked ? sma(bars, n1) : []);
+    ma2.setData($("ma2Toggle").checked ? sma(bars, n2) : []);
+    if (fit) applyRange();
+    summary();
+    readout(null);
+  }
+  function applyRange() {
+    const bars = currentBars; if (!bars.length) return;
+    const last = bars[bars.length - 1].time;
+    const from = state.months ? monthsBefore(last, state.months) : null;
+    if (!from || from <= bars[0].time) chart.timeScale().fitContent();
+    else chart.timeScale().setVisibleRange({ from, to: last });
+  }
+  function summary() {
+    const bars = currentBars, m = state.meta || {};
+    $("sym").textContent = state.ticker;
+    $("exch").textContent = [m.exchange, m.currency].filter(Boolean).join("・");
+    const last = bars[bars.length - 1], prev = bars[bars.length - 2];
+    $("price").textContent = "$" + fmt(last.close);
+    if (prev) {
+      const ch = last.close - prev.close, pct = ch / prev.close * 100;
+      const unit = { D: "前日比", W: "前週比", M: "前月比" }[state.tf];
+      $("chg").textContent = `${unit} ${ch >= 0 ? "+" : ""}${fmt(ch)}（${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%）`;
+      $("chg").className = "chg " + (ch >= 0 ? "up" : "down");
+    } else { $("chg").textContent = ""; }
+    const daily = state.daily, lastD = daily[daily.length - 1];
+    const from = state.months ? monthsBefore(lastD.time, state.months) : daily[0].time;
+    const start = daily.find((b) => b.time >= from) || daily[0];
+    const ret = lastD.close / start.close - 1;
+    const years = (new Date(lastD.time) - new Date(start.time)) / (365.25 * 864e5);
+    let html = `<span>表示期間 <b>${fmtDate(start.time)}〜${fmtDate(lastD.time)}</b></span><span>期間騰落率 <b class="${ret >= 0 ? "up" : "down"}">${ret >= 0 ? "+" : ""}${(ret * 100).toFixed(1)}%</b></span>`;
+    if (years >= 0.95) {
+      const cagr = Math.pow(lastD.close / start.close, 1 / years) - 1;
+      html += `<span>年率（CAGR） <b class="${cagr >= 0 ? "up" : "down"}">${cagr >= 0 ? "+" : ""}${(cagr * 100).toFixed(1)}%</b></span>`;
+    }
+    if (state.months && from < daily[0].time) html += `<span>※データは${fmtDate(daily[0].time)}からのため、それ以降で計算</span>`;
+    $("stats").innerHTML = html;
+  }
+
+  // ---------- 銘柄の読み込み ----------
+  async function load(t) {
+    t = (t || "").trim().toUpperCase().replace(/[^A-Z0-9.\-]/g, "");
+    if (!t) return;
+    $("tickerInput").value = t;
+    if (!getKey()) { $("keyBox").hidden = false; $("keyInput").focus(); return; }
+    showError("");
+    $("goBtn").disabled = true; $("goBtn").textContent = "取得中…";
+    $("emptyMsg").hidden = false; $("emptyMsg").textContent = `${t} の株価を取得しています…`;
+    try {
+      const data = await fetchDaily(t);
+      state.ticker = t; state.daily = data.values; state.meta = data.meta;
+      store.set("last_ticker", t);
+      $("emptyMsg").hidden = true;
+      render(true);
+    } catch (err) {
+      showError(err.message);
+      $("emptyMsg").hidden = !!state.daily.length;
+      $("emptyMsg").textContent = "チャートを表示できませんでした";
+    } finally {
+      $("goBtn").disabled = false; $("goBtn").textContent = "表示";
+    }
+  }
+
+  // ---------- 操作 ----------
+  $("tickerForm").addEventListener("submit", (e) => { e.preventDefault(); load($("tickerInput").value); });
+  $("keyForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const k = $("keyInput").value.trim();
+    if (!k) return;
+    if (!store.set(KEY_STORE, k)) memKey = k;
+    $("keyInput").value = ""; $("keyBox").hidden = true;
+    load($("tickerInput").value || "QQQ");
+  });
+  $("changeKey").addEventListener("click", () => { $("keyBox").hidden = false; $("keyInput").focus(); });
+  function segment(id, onPick) {
+    $(id).addEventListener("click", (e) => {
+      const btn = e.target.closest("button"); if (!btn) return;
+      $(id).querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      onPick(btn.dataset);
+    });
+  }
+  segment("tfSeg", (d) => { state.tf = d.tf; render(true); });
+  segment("rangeSeg", (d) => { state.months = +d.m; if (currentBars.length) { applyRange(); summary(); } });
+  ["ma1Toggle", "ma2Toggle", "volToggle"].forEach((id) => $(id).addEventListener("change", () => render(false)));
+
+  // ---------- 起動 ----------
+  if (initChart()) {
+    const last = store.get("last_ticker") || "QQQ";
+    $("tickerInput").value = last;
+    if (getKey()) load(last);
+    else { $("keyBox").hidden = false; }
+  }
+})();
+</script>
+</body>
+</html>
